@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { supabase } from '../supabaseClient'
+import { supabase } from '../../supabaseClient'
 import { useAuth } from './useAuth'
 
 export function useParticipation() {

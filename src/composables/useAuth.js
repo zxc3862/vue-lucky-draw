@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { supabase } from '../supabaseClient'
+import { supabase } from '../../supabaseClient'
 
 // 全域狀態管理
 const currentUser = ref(null)
