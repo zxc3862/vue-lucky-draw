@@ -33,12 +33,12 @@
     
     <div class="draw-section">
       <button @click="draw" class="draw-btn" :disabled="totalBalls === 0">
-        🎯 抽獎 (總球數: {{ totalBalls }})
+        🎯 抽球 (總球數: {{ totalBalls }})
       </button>
     </div>
     
     <div v-if="drawHistory.length > 0" class="history">
-      <h3>📜 抽獎歷史</h3>
+      <h3>📜 抽球歷史</h3>
       <div v-for="record in drawHistory.slice(0, 5)" :key="record.id" class="history-item">
         🎉 {{ record.winner_name }} ({{ new Date(record.draw_time).toLocaleString() }})
       </div>
@@ -114,11 +114,11 @@ const removePlayer = async (id) => {
 
 const draw = async () => {
   const ballPool = players.value.flatMap(player => Array(player.balls).fill(player))
-  if (ballPool.length === 0) return alert('沒有球可以抽獎')
+  if (ballPool.length === 0) return alert('沒有球可以抽球')
   
   const winner = ballPool[Math.floor(Math.random() * ballPool.length)]
   
-  // 記錄抽獎歷史
+  // 記錄抽球歷史
   await supabase.from('draw_history').insert([{
     winner_id: winner.id,
     winner_name: winner.name,

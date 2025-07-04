@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS players (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. 建立抽獎歷史表 (可選)
+-- 2. 建立抽球歷史表 (可選)
 CREATE TABLE IF NOT EXISTS draw_history (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   winner_id UUID REFERENCES players(id) ON DELETE CASCADE,
@@ -44,7 +44,7 @@ DROP POLICY IF EXISTS "Allow authenticated modify players" ON players;
 CREATE POLICY "Allow authenticated modify players" ON players 
 FOR ALL USING (auth.role() = 'authenticated');
 
--- 抽獎歷史：所有人可讀取，只有認證用戶可插入
+-- 抽球歷史：所有人可讀取，只有認證用戶可插入
 DROP POLICY IF EXISTS "Allow public read history" ON draw_history;
 CREATE POLICY "Allow public read history" ON draw_history 
 FOR SELECT USING (true);

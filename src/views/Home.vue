@@ -1,9 +1,13 @@
 
-<template>
+<t    <header class="header">
+      <h1>🎯 抽球系統</h1>
+      <p>歡迎參與我們的抽球活動！球數越多，中獎機率越高！</p>
+      <router-link to="/admin/login" class="admin-link">🔐 管理員入口</router-link>
+    </header>te>
   <div class="home">
     <header class="header">
       <h1>� 抽獎系統</h1>
-      <p>歡迎參與我們的抽獎活動！球數越多，中獎機率越高！</p>
+      <p>歡迎參與我們的抽球活動！球數越多，中獎機率越高！</p>
       <router-link to="/admin/login" class="admin-link">🔐 管理員入口</router-link>
     </header>
     
