@@ -4,8 +4,9 @@
   "main": "main.js",
   "scripts": {
     "dev": "vite",
-  "build": "vite build",
-  "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && vercel --prod"
   },
   "repository": {
     "type": "git",
@@ -20,7 +21,12 @@
   "homepage": "https://github.com/zxc3862/vue-lucky-draw#readme",
   "description": "",
   "dependencies": {
-    "vite": "^7.0.1",
-    "vue": "^3.5.17"
+    "vue": "^3.5.17",
+    "vue-router": "^4.4.0",
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "@vitejs/plugin-vue": "^5.2.0"
   }
 }

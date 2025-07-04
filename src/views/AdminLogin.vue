@@ -7,7 +7,7 @@
 </template>
 
 <script setup>
-import { supabase } from '../supabaseClient'
+import { supabase } from '../../supabaseClient'
 import { ref } from 'vue'
 
 const email = ref('')
