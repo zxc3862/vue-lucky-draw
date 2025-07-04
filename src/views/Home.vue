@@ -87,6 +87,38 @@
         </div>
       </section>
 
+      <!-- 參與控制區 -->
+      <section v-if="canParticipate" class="participation-section">
+        <div class="participation-card">
+          <h3>🎯 參與抽球</h3>
+          <div class="participation-content">
+            <div v-if="userPlayer" class="player-status">
+              <div class="status-info">
+                <span class="player-name">{{ userPlayer.name }}</span>
+                <span class="player-balls">🎱 {{ userPlayer.balls }} 球</span>
+                <span class="participation-status" :class="{ active: isParticipating }">
+                  {{ isParticipating ? '✅ 參與中' : '⏸️ 暫停參與' }}
+                </span>
+              </div>
+              <div class="status-actions">
+                <button @click="handleToggleParticipation" class="participation-btn" :disabled="participationLoading">
+                  {{ participationLoading ? '處理中...' : participationText }}
+                </button>
+                <button @click="showEditName = true" class="edit-name-btn">
+                  ✏️ 修改名稱
+                </button>
+              </div>
+            </div>
+            <div v-else class="join-prompt">
+              <p>您還沒有參與抽球活動</p>
+              <button @click="handleToggleParticipation" class="join-btn" :disabled="participationLoading">
+                {{ participationLoading ? '處理中...' : '加入抽球' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 玩家排行榜 -->
       <section class="players-section">
         <h2>🏆 參與者排行榜</h2>
@@ -137,6 +169,25 @@
         </button>
       </section>
     </main>
+
+    <!-- 編輯名稱對話框 -->
+    <div v-if="showEditName" class="modal-overlay" @click="closeEditNameDialog">
+      <div class="modal-content" @click.stop>
+        <h3>✏️ 修改玩家名稱</h3>
+        <div class="edit-form">
+          <div class="form-group">
+            <label>新名稱</label>
+            <input v-model="newPlayerName" type="text" class="form-input" placeholder="請輸入新名稱" />
+          </div>
+          <div class="form-actions">
+            <button @click="handleUpdateName" class="save-btn" :disabled="!newPlayerName.trim()">
+              💾 儲存
+            </button>
+            <button @click="closeEditNameDialog" class="cancel-btn">❌ 取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -145,6 +196,7 @@ import { supabase } from '../../supabaseClient'
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useParticipation } from '../composables/useParticipation'
 
 const router = useRouter()
 const { 
@@ -157,15 +209,32 @@ const {
   logout
 } = useAuth()
 
+const {
+  isParticipating,
+  userPlayer,
+  canParticipate,
+  participationText,
+  checkParticipationStatus,
+  toggleParticipation,
+  updatePlayerName
+} = useParticipation()
+
 // 響應式數據
 const players = ref([])
 const drawHistory = ref([])
 const drawStatus = ref(null)
 const isRefreshing = ref(false)
 const showAllHistory = ref(false)
+const participationLoading = ref(false)
+const showEditName = ref(false)
+const newPlayerName = ref('')
 
 // 計算屬性
-const totalBalls = computed(() => players.value.reduce((sum, p) => sum + p.balls, 0))
+const totalBalls = computed(() => 
+  players.value
+    .filter(p => p.is_participating) // 只計算參與中的玩家
+    .reduce((sum, p) => sum + p.balls, 0)
+)
 
 const roleClass = computed(() => ({
   'role-admin': isAdmin.value,
@@ -223,6 +292,7 @@ const fetchPlayers = async () => {
     const { data, error } = await supabase
       .from('players')
       .select('*')
+      .eq('is_participating', true) // 只顯示參與中的玩家
       .order('balls', { ascending: false })
     
     if (error) throw error
@@ -285,9 +355,51 @@ const handleLogout = async () => {
   }
 }
 
+const handleToggleParticipation = async () => {
+  participationLoading.value = true
+  try {
+    const result = await toggleParticipation()
+    if (result.success) {
+      alert(result.message)
+      await refreshData() // 重新整理數據顯示最新狀態
+    } else {
+      alert(result.error)
+    }
+  } catch (error) {
+    console.error('切換參與狀態失敗:', error)
+    alert('操作失敗，請稍後再試')
+  } finally {
+    participationLoading.value = false
+  }
+}
+
+const closeEditNameDialog = () => {
+  showEditName.value = false
+  newPlayerName.value = ''
+}
+
+const handleUpdateName = async () => {
+  if (!newPlayerName.value.trim()) return
+  
+  try {
+    const result = await updatePlayerName(newPlayerName.value.trim())
+    if (result.success) {
+      alert(result.message)
+      closeEditNameDialog()
+      await refreshData()
+    } else {
+      alert(result.error)
+    }
+  } catch (error) {
+    console.error('更新名稱失敗:', error)
+    alert('更新失敗，請稍後再試')
+  }
+}
+
 // 初始化
 onMounted(async () => {
   await checkAuth()
+  await checkParticipationStatus()
   await refreshData()
 })
 </script>
@@ -536,78 +648,46 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
-/* 玩家排行榜 */
-.players-section {
+/* 參與控制區 */
+.participation-section {
   margin-bottom: 3rem;
 }
 
-.players-section h2 {
-  color: white;
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.empty-state {
-  text-align: center;
+.participation-card {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 1rem;
-  padding: 3rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
+.participation-card h3 {
+  margin: 0 0 1rem 0;
+  color: #2d3748;
 }
 
-.players-grid {
-  display: grid;
+.participation-content {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-.player-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 1rem;
-  padding: 1rem;
+.player-status {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s;
 }
 
-.player-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.top-player {
-  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-}
-
-.rank-badge {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
+.status-info {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 1.125rem;
-}
-
-.rank-1 { background: #ffd700; color: #b45309; }
-.rank-2 { background: #c0c0c0; color: #4a5568; }
-.rank-3 { background: #cd7f32; color: white; }
-
-.player-info {
-  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .player-name {
   font-weight: 600;
   color: #2d3748;
-  margin-bottom: 0.25rem;
+  font-size: 1.125rem;
 }
 
 .player-balls {
@@ -615,31 +695,82 @@ onMounted(async () => {
   font-size: 0.875rem;
 }
 
-.player-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
-}
-
-.chance-bar {
-  width: 80px;
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.chance-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4299e1, #3182ce);
-  transition: width 0.3s ease;
-}
-
-.chance-text {
+.participation-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #4299e1;
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.participation-status.active {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.status-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.participation-btn,
+.edit-name-btn,
+.join-btn {
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.participation-btn {
+  background: #4299e1;
+  color: white;
+}
+
+.participation-btn:hover:not(:disabled) {
+  background: #3182ce;
+  transform: translateY(-2px);
+}
+
+.edit-name-btn {
+  background: #ed8936;
+  color: white;
+}
+
+.edit-name-btn:hover {
+  background: #dd6b20;
+  transform: translateY(-2px);
+}
+
+.join-btn {
+  background: #48bb78;
+  color: white;
+  padding: 1rem 2rem;
+}
+
+.join-btn:hover:not(:disabled) {
+  background: #38a169;
+  transform: translateY(-2px);
+}
+
+.join-prompt {
+  text-align: center;
+  padding: 2rem;
+}
+
+.join-prompt p {
+  margin-bottom: 1rem;
+  color: #718096;
+}
+
+.participation-btn:disabled,
+.join-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* 抽球歷史 */
@@ -789,5 +920,103 @@ onMounted(async () => {
   .history-item {
     padding: 0.75rem;
   }
+}
+
+/* 模態框樣式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content h3 {
+  margin: 0 0 1.5rem 0;
+  color: #2d3748;
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-input {
+  padding: 0.75rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #4299e1;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.save-btn,
+.cancel-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.save-btn {
+  background: #48bb78;
+  color: white;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #38a169;
+}
+
+.save-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.cancel-btn:hover {
+  background: #cbd5e0;
 }
 </style>

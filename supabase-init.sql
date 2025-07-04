@@ -1,11 +1,13 @@
 -- Vue Lucky Draw 資料庫初始化腳本
 -- 在 Supabase SQL Editor 中執行此腳本
 
--- 1. 建立玩家表
+-- 1. 建立玩家表（支援用戶關聯）
 CREATE TABLE IF NOT EXISTS players (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- 關聯到用戶帳號（可選）
   name TEXT NOT NULL UNIQUE,
   balls INTEGER DEFAULT 1 CHECK (balls >= 0),
+  is_participating BOOLEAN DEFAULT true, -- 是否參加當前局
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -21,7 +23,18 @@ CREATE TABLE IF NOT EXISTS user_roles (
   UNIQUE(email)
 );
 
--- 3. 建立抽球歷史表
+-- 3. 建立用戶參與狀態表
+CREATE TABLE IF NOT EXISTS user_participations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  player_id UUID REFERENCES players(id) ON DELETE CASCADE,
+  is_participating BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id) -- 每個用戶只能有一個參與記錄
+);
+
+-- 4. 建立抽球歷史表
 CREATE TABLE IF NOT EXISTS draw_history (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   winner_id UUID REFERENCES players(id) ON DELETE CASCADE,
@@ -31,7 +44,7 @@ CREATE TABLE IF NOT EXISTS draw_history (
   draw_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. 建立抽球狀態表 (顯示當前抽球狀況)
+-- 5. 建立抽球狀態表 (顯示當前抽球狀況)
 CREATE TABLE IF NOT EXISTS draw_status (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   status TEXT NOT NULL CHECK (status IN ('waiting', 'drawing', 'completed')),
@@ -42,12 +55,12 @@ CREATE TABLE IF NOT EXISTS draw_status (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. 插入預設抽球狀態
+-- 6. 插入預設抽球狀態
 INSERT INTO draw_status (status, total_participants, total_balls) 
 VALUES ('waiting', 0, 0)
 ON CONFLICT DO NOTHING;
 
--- 6. 插入測試資料
+-- 7. 插入測試資料
 INSERT INTO players (name, balls) VALUES 
 ('張三', 3),
 ('李四', 2),
@@ -57,13 +70,14 @@ INSERT INTO players (name, balls) VALUES
 ('小美', 2)
 ON CONFLICT (name) DO NOTHING;
 
--- 7. 設置 Row Level Security (RLS)
+-- 8. 設置 Row Level Security (RLS)
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_participations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draw_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE draw_status ENABLE ROW LEVEL SECURITY;
 
--- 8. 設置安全政策
+-- 9. 設置安全政策
 
 -- 玩家表：所有人可讀取，只有管理員可修改
 DROP POLICY IF EXISTS "Allow public read players" ON players;
@@ -95,6 +109,29 @@ FOR ALL USING (
   )
 );
 
+-- 用戶參與狀態表：用戶可查看自己的參與狀態，只有管理員可修改
+DROP POLICY IF EXISTS "Users can view own participation" ON user_participations;
+CREATE POLICY "Users can view own participation" ON user_participations 
+FOR SELECT USING (user_id = auth.uid() OR EXISTS (
+  SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'
+));
+
+DROP POLICY IF EXISTS "Allow admin manage participations" ON user_participations;
+CREATE POLICY "Allow admin manage participations" ON user_participations 
+FOR ALL USING (
+  EXISTS (
+    SELECT 1 FROM user_roles 
+    WHERE user_id = auth.uid() AND role = 'admin'
+  )
+);
+
+-- 用戶參與表：用戶只能管理自己的參與狀態
+DROP POLICY IF EXISTS "Users can manage own participation" ON user_participations;
+CREATE POLICY "Users can manage own participation" ON user_participations 
+FOR ALL USING (user_id = auth.uid() OR EXISTS (
+  SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin'
+));
+
 -- 抽球歷史：所有人可讀取，只有管理員可插入
 DROP POLICY IF EXISTS "Allow public read history" ON draw_history;
 CREATE POLICY "Allow public read history" ON draw_history 
@@ -123,7 +160,7 @@ FOR ALL USING (
   )
 );
 
--- 9. 建立更新時間觸發器
+-- 10. 建立更新時間觸發器
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -142,7 +179,7 @@ CREATE TRIGGER update_draw_status_updated_at
     BEFORE UPDATE ON draw_status 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- 10. 建立統計視圖
+-- 11. 建立統計視圖
 CREATE OR REPLACE VIEW player_stats AS
 SELECT 
     COUNT(*) as total_players,
@@ -152,7 +189,7 @@ SELECT
     MIN(balls) as min_balls
 FROM players;
 
--- 11. 建立管理員檢查函數
+-- 12. 建立管理員檢查函數
 CREATE OR REPLACE FUNCTION is_admin(user_uuid UUID)
 RETURNS BOOLEAN AS $$
 BEGIN

@@ -89,9 +89,17 @@
               <div v-for="player in players" :key="player.id" class="player-item">
                 <div class="player-info">
                   <span class="player-name">{{ player.name }}</span>
-                  <span class="player-balls">🎱 {{ player.balls }} 球</span>
+                  <div class="player-details">
+                    <span class="player-balls">🎱 {{ player.balls }} 球</span>
+                    <span class="participation-status" :class="{ active: player.is_participating }">
+                      {{ player.is_participating ? '✅ 參與中' : '⏸️ 暫停參與' }}
+                    </span>
+                  </div>
                 </div>
                 <div class="player-actions">
+                  <button @click="togglePlayerParticipation(player)" class="action-btn" :class="player.is_participating ? 'pause' : 'resume'">
+                    {{ player.is_participating ? '⏸️' : '▶️' }}
+                  </button>
                   <button @click="addBall(player.id)" class="action-btn add">+1</button>
                   <button @click="removeBall(player.id)" class="action-btn remove" :disabled="player.balls <= 0">-1</button>
                   <button @click="editPlayer(player)" class="action-btn edit">✏️</button>
@@ -146,6 +154,23 @@
             <p v-if="totalBalls === 0" class="draw-warning">
               ⚠️ 目前沒有球可以抽取，請先為玩家添加球數
             </p>
+          </div>
+
+          <!-- 系統重置控制 -->
+          <div class="reset-control-card">
+            <h3>🔄 系統重置</h3>
+            <div class="reset-actions">
+              <button @click="resetCurrentRound" class="reset-round-btn" :disabled="isResetting">
+                {{ isResetting ? '重置中...' : '🔄 重置當局' }}
+              </button>
+              <button @click="resetAllData" class="reset-all-btn" :disabled="isResetting">
+                {{ isResetting ? '重置中...' : '⚠️ 重置全部資料' }}
+              </button>
+            </div>
+            <div class="reset-info">
+              <p><strong>重置當局：</strong>清空所有球數，保留玩家與歷史記錄</p>
+              <p><strong>重置全部資料：</strong>刪除所有玩家、歷史記錄，重新開始</p>
+            </div>
           </div>
 
           <!-- 抽球歷史 -->
@@ -275,6 +300,7 @@ const newUserRole = ref('')
 const activeTab = ref('players')
 const isRefreshing = ref(false)
 const isDrawing = ref(false)
+const isResetting = ref(false)
 const showAllHistory = ref(false)
 const editingPlayer = ref(null)
 
@@ -286,7 +312,11 @@ const tabs = [
 ]
 
 // 計算屬性
-const totalBalls = computed(() => players.value.reduce((sum, p) => sum + p.balls, 0))
+const totalBalls = computed(() => 
+  players.value
+    .filter(p => p.is_participating) // 只計算參與中的玩家
+    .reduce((sum, p) => sum + p.balls, 0)
+)
 
 const roleText = computed(() => {
   switch (userRole.value) {
@@ -480,8 +510,16 @@ const performDraw = async () => {
   isDrawing.value = true
   
   try {
+    // 只從參與中的玩家建立球池
+    const participatingPlayers = players.value.filter(player => player.is_participating && player.balls > 0)
+    
+    if (participatingPlayers.length === 0) {
+      alert('沒有參與中的玩家有球可以抽取')
+      return
+    }
+    
     // 建立球池
-    const ballPool = players.value.flatMap(player => 
+    const ballPool = participatingPlayers.flatMap(player => 
       Array(player.balls).fill(player)
     )
     
@@ -573,6 +611,100 @@ const handleLogout = async () => {
     router.push('/')
   } catch (error) {
     console.error('登出失敗:', error)
+  }
+}
+
+const resetCurrentRound = async () => {
+  const confirmMessage = '確定要重置當局嗎？\n\n這將：\n- 清空所有玩家的球數\n- 保留玩家名單和歷史記錄\n\n此操作無法撤銷。'
+  
+  if (!confirm(confirmMessage)) return
+  
+  isResetting.value = true
+  
+  try {
+    // 清空所有玩家球數
+    const { error: clearBallsError } = await supabase
+      .from('players')
+      .update({ balls: 0 })
+      .neq('id', '00000000-0000-0000-0000-000000000000') // 更新所有記錄
+    
+    if (clearBallsError) throw clearBallsError
+    
+    // 更新抽球狀態
+    const { error: statusError } = await supabase
+      .from('draw_status')
+      .update({ 
+        status: 'waiting',
+        current_winner: null,
+        total_participants: 0,
+        total_balls: 0,
+        last_draw_time: null,
+        updated_at: new Date().toISOString()
+      })
+    
+    if (statusError) throw statusError
+    
+    alert('✅ 當局重置完成！所有玩家球數已清空。')
+    
+    await Promise.all([fetchPlayers(), fetchDrawHistory()])
+  } catch (error) {
+    console.error('重置當局失敗:', error)
+    alert('重置失敗，請稍後再試')
+  } finally {
+    isResetting.value = false
+  }
+}
+
+const resetAllData = async () => {
+  const confirmMessage = '🚨 警告：您即將重置全部資料！\n\n這將：\n- 刪除所有玩家資料\n- 刪除所有抽球歷史\n- 重置抽球狀態\n\n此操作無法撤銷！\n\n請輸入 "RESET" 確認此操作。'
+  
+  const userInput = prompt(confirmMessage)
+  if (userInput !== 'RESET') {
+    alert('已取消重置操作')
+    return
+  }
+  
+  isResetting.value = true
+  
+  try {
+    // 刪除所有抽球歷史
+    const { error: historyError } = await supabase
+      .from('draw_history')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // 刪除所有記錄
+    
+    if (historyError) throw historyError
+    
+    // 刪除所有玩家
+    const { error: playersError } = await supabase
+      .from('players')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // 刪除所有記錄
+    
+    if (playersError) throw playersError
+    
+    // 重置抽球狀態
+    const { error: statusError } = await supabase
+      .from('draw_status')
+      .update({ 
+        status: 'waiting',
+        current_winner: null,
+        total_participants: 0,
+        total_balls: 0,
+        last_draw_time: null,
+        updated_at: new Date().toISOString()
+      })
+    
+    if (statusError) throw statusError
+    
+    alert('✅ 全部資料重置完成！系統已回到初始狀態。')
+    
+    await Promise.all([fetchPlayers(), fetchDrawHistory()])
+  } catch (error) {
+    console.error('重置全部資料失敗:', error)
+    alert('重置失敗，請稍後再試')
+  } finally {
+    isResetting.value = false
   }
 }
 
@@ -902,6 +1034,12 @@ onMounted(async () => {
   gap: 0.25rem;
 }
 
+.player-details {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .player-name,
 .user-email {
   font-weight: 600;
@@ -950,6 +1088,16 @@ onMounted(async () => {
 .action-btn.remove { background: #ed8936; color: white; }
 .action-btn.edit { background: #4299e1; color: white; }
 .action-btn.delete { background: #f56565; color: white; }
+
+.action-btn.pause {
+  background: #ed8936;
+  color: white;
+}
+
+.action-btn.resume {
+  background: #48bb78;
+  color: white;
+}
 
 .action-btn:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -1220,6 +1368,86 @@ onMounted(async () => {
 
 .cancel-btn:hover {
   background: #cbd5e0;
+}
+
+/* 系統重置控制 */
+.reset-control-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #f56565;
+}
+
+.reset-control-card h3 {
+  margin: 0 0 1rem 0;
+  color: #2d3748;
+}
+
+.reset-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.reset-round-btn,
+.reset-all-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.reset-round-btn {
+  background: #ed8936;
+  color: white;
+}
+
+.reset-round-btn:hover:not(:disabled) {
+  background: #dd6b20;
+  transform: translateY(-2px);
+}
+
+.reset-all-btn {
+  background: #f56565;
+  color: white;
+}
+
+.reset-all-btn:hover:not(:disabled) {
+  background: #e53e3e;
+  transform: translateY(-2px);
+}
+
+.reset-round-btn:disabled,
+.reset-all-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.reset-info {
+  padding: 1rem;
+  background: #fff5f5;
+  border-radius: 0.5rem;
+  border: 1px solid #feb2b2;
+}
+
+.reset-info p {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  color: #742a2a;
+}
+
+.reset-info p:first-child {
+  margin-top: 0;
+}
+
+.reset-info p:last-child {
+  margin-bottom: 0;
 }
 
 /* 響應式設計 */

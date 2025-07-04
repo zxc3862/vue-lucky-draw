@@ -66,12 +66,47 @@ export function useAuth() {
   // 登入
   const login = async (email) => {
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email })
+      const { error } = await supabase.auth.signInWithOtp({ 
+        email,
+        options: {
+          shouldCreateUser: true
+        }
+      })
       if (error) throw error
       
       return { success: true, message: '請至信箱收信完成登入' }
     } catch (error) {
       console.error('登入失敗:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // 忘記密碼 / 重設密碼
+  const resetPassword = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+      if (error) throw error
+      
+      return { success: true, message: '重設密碼連結已發送至您的信箱' }
+    } catch (error) {
+      console.error('重設密碼失敗:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  // 更新密碼
+  const updatePassword = async (newPassword) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+      if (error) throw error
+      
+      return { success: true, message: '密碼更新成功' }
+    } catch (error) {
+      console.error('更新密碼失敗:', error)
       return { success: false, error: error.message }
     }
   }
@@ -123,6 +158,8 @@ export function useAuth() {
     fetchUserRole,
     setUserRole,
     login,
+    resetPassword,
+    updatePassword,
     logout,
     setupAuthListener
   }

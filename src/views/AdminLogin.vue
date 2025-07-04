@@ -1,4 +1,3 @@
-
 <template>
   <div class="login-container">
     <div class="login-card">
@@ -25,6 +24,12 @@
           <span v-if="isLoading">發送中...</span>
           <span v-else>🚀 發送登入連結</span>
         </button>
+        
+        <div class="login-options">
+          <button type="button" @click="handleForgotPassword" class="forgot-password-btn" :disabled="isLoading || !email">
+            🔑 忘記密碼？
+          </button>
+        </div>
       </form>
       
       <div v-if="message" class="message" :class="messageType">
@@ -61,7 +66,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { login } = useAuth()
+const { login, resetPassword } = useAuth()
 
 const email = ref('')
 const message = ref('')
@@ -93,6 +98,35 @@ const handleLogin = async () => {
     messageType.value = 'error'
     message.value = '登入過程中發生錯誤，請稍後再試'
     console.error('登入錯誤:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const handleForgotPassword = async () => {
+  if (!email.value) {
+    messageType.value = 'error'
+    message.value = '請先輸入 Email 地址'
+    return
+  }
+  
+  isLoading.value = true
+  message.value = ''
+  
+  try {
+    const result = await resetPassword(email.value)
+    
+    if (result.success) {
+      messageType.value = 'success'
+      message.value = result.message
+    } else {
+      messageType.value = 'error'
+      message.value = result.error || '重設密碼失敗，請稍後再試'
+    }
+  } catch (error) {
+    messageType.value = 'error'
+    message.value = '重設密碼過程中發生錯誤，請稍後再試'
+    console.error('重設密碼錯誤:', error)
   } finally {
     isLoading.value = false
   }
@@ -294,6 +328,30 @@ const handleLogin = async () => {
 
 .back-btn:hover {
   color: #3182ce;
+}
+
+.login-options {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.forgot-password-btn {
+  background: none;
+  border: none;
+  color: #4299e1;
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.forgot-password-btn:hover:not(:disabled) {
+  color: #3182ce;
+}
+
+.forgot-password-btn:disabled {
+  color: #a0aec0;
+  cursor: not-allowed;
 }
 
 /* 響應式設計 */
