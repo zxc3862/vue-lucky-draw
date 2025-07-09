@@ -2,11 +2,11 @@
   <div class="login-container">
     <div class="login-card">
       <div class="login-header">
-        <h2>🔐 用戶登入</h2>
-        <p>請輸入您的 Email 地址，我們將發送登入連結到您的信箱</p>
+        <h2>🔐 {{ isRegisterMode ? '用戶註冊' : '用戶登入' }}</h2>
+        <p>{{ isRegisterMode ? '創建新帳號來參與抽球系統' : '請輸入您的帳號密碼登入系統' }}</p>
       </div>
       
-      <form @submit.prevent="handleLogin" class="login-form">
+      <form @submit.prevent="handleSubmit" class="login-form">
         <div class="form-group">
           <label for="email">Email 地址</label>
           <input
@@ -20,13 +20,58 @@
           />
         </div>
         
-        <button type="submit" :disabled="isLoading || !email" class="login-btn">
-          <span v-if="isLoading">發送中...</span>
-          <span v-else>🚀 發送登入連結</span>
+        <div class="form-group">
+          <label for="password">密碼</label>
+          <input
+            id="password"
+            v-model="password"
+            type="password"
+            placeholder="請輸入密碼"
+            required
+            :disabled="isLoading"
+            class="form-input"
+            minlength="6"
+          />
+        </div>
+        
+        <div v-if="isRegisterMode" class="form-group">
+          <label for="confirmPassword">確認密碼</label>
+          <input
+            id="confirmPassword"
+            v-model="confirmPassword"
+            type="password"
+            placeholder="請再次輸入密碼"
+            required
+            :disabled="isLoading"
+            class="form-input"
+            minlength="6"
+          />
+        </div>
+        
+        <div v-if="isRegisterMode" class="form-group">
+          <label for="displayName">顯示名稱</label>
+          <input
+            id="displayName"
+            v-model="displayName"
+            type="text"
+            placeholder="請輸入您的顯示名稱"
+            required
+            :disabled="isLoading"
+            class="form-input"
+          />
+        </div>
+        
+        <button type="submit" :disabled="isLoading || !isValidForm" class="login-btn">
+          <span v-if="isLoading">{{ isRegisterMode ? '註冊中...' : '登入中...' }}</span>
+          <span v-else>{{ isRegisterMode ? '🚀 註冊帳號' : '🚀 登入系統' }}</span>
         </button>
         
         <div class="login-options">
-          <button type="button" @click="handleForgotPassword" class="forgot-password-btn" :disabled="isLoading || !email">
+          <button type="button" @click="toggleMode" class="toggle-mode-btn" :disabled="isLoading">
+            {{ isRegisterMode ? '已有帳號？點此登入' : '沒有帳號？點此註冊' }}
+          </button>
+          
+          <button v-if="!isRegisterMode" type="button" @click="handleForgotPassword" class="forgot-password-btn" :disabled="isLoading || !email">
             🔑 忘記密碼？
           </button>
         </div>
@@ -61,43 +106,122 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
-const { login, resetPassword } = useAuth()
+const { login, register, resetPassword, checkAuth } = useAuth()
 
 const email = ref('')
+const password = ref('')
+const confirmPassword = ref('')
+const displayName = ref('')
 const message = ref('')
 const messageType = ref('')
 const isLoading = ref(false)
+const isRegisterMode = ref(false)
 
-const handleLogin = async () => {
-  if (!email.value) return
+const isValidForm = computed(() => {
+  if (isRegisterMode.value) {
+    return email.value && password.value.length >= 6 && password.value === confirmPassword.value && displayName.value.trim()
+  }
+  return email.value && password.value.length >= 6
+})
+
+const toggleMode = () => {
+  isRegisterMode.value = !isRegisterMode.value
+  message.value = ''
+  password.value = ''
+  confirmPassword.value = ''
+}
+
+const clearForm = () => {
+  email.value = ''
+  password.value = ''
+  confirmPassword.value = ''
+  displayName.value = ''
+}
+
+const handleSubmit = async () => {
+  if (!isValidForm.value) return
   
   isLoading.value = true
   message.value = ''
   
   try {
-    const result = await login(email.value)
-    
-    if (result.success) {
-      messageType.value = 'success'
-      message.value = result.message
+    if (isRegisterMode.value) {
+      // 註冊流程
+      console.log('🚀 AdminLogin.vue: 開始註冊流程')
+      console.log('📧 Email:', email.value)
+      console.log('👤 顯示名稱:', displayName.value)
       
-      // 3秒後跳轉到首頁
-      setTimeout(() => {
-        router.push('/')
-      }, 3000)
+      const result = await register(email.value, password.value, displayName.value)
+      
+      console.log('📊 AdminLogin.vue: 註冊結果:', result)
+      
+      if (result.success) {
+        messageType.value = 'success'
+        message.value = result.message
+        
+        console.log('✅ AdminLogin.vue: 註冊成功，準備切換到登入模式')
+        
+        // 註冊成功後自動切換到登入模式
+        setTimeout(() => {
+          isRegisterMode.value = false
+          clearForm()
+          message.value = '註冊成功！請用剛才的帳號密碼登入'
+          messageType.value = 'success'
+        }, 2000)
+      } else {
+        console.error('❌ AdminLogin.vue: 註冊失敗:', result.error)
+        messageType.value = 'error'
+        message.value = result.error || '註冊失敗，請稍後再試'
+      }
     } else {
-      messageType.value = 'error'
-      message.value = result.error || '登入失敗，請稍後再試'
+      // 登入流程
+      console.log('🔄 開始登入流程...', email.value)
+      const result = await login(email.value, password.value)
+      
+      console.log('📊 登入結果:', result)
+      
+      if (result.success) {
+        messageType.value = 'success'
+        message.value = '登入成功！正在跳轉...'
+        
+        console.log('✅ 登入成功，準備跳轉到首頁')
+        
+        // 使用多種方式確保跳轉成功
+        try {
+          // 方式1: 使用 Vue Router
+          console.log('🔄 嘗試使用 Vue Router 跳轉...')
+          await router.replace('/')
+          console.log('✅ Vue Router 跳轉成功')
+        } catch (routeError) {
+          console.error('❌ Vue Router 跳轉失敗:', routeError)
+          
+          // 方式2: 直接修改 window.location.hash
+          console.log('🔄 使用 hash 跳轉備用方案...')
+          window.location.hash = '#/'
+          
+          // 方式3: 如果 hash 也不行，使用 window.location.href
+          setTimeout(() => {
+            if (window.location.hash !== '#/') {
+              console.log('🔄 使用 href 跳轉備用方案...')
+              window.location.href = '/#/'
+            }
+          }, 500)
+        }
+      } else {
+        console.error('❌ 登入失敗:', result.error)
+        messageType.value = 'error'
+        message.value = result.error || '登入失敗，請檢查帳號密碼'
+      }
     }
   } catch (error) {
     messageType.value = 'error'
-    message.value = '登入過程中發生錯誤，請稍後再試'
-    console.error('登入錯誤:', error)
+    message.value = '操作過程中發生錯誤，請稍後再試'
+    console.error('操作錯誤:', error)
   } finally {
     isLoading.value = false
   }
@@ -350,6 +474,26 @@ const handleForgotPassword = async () => {
 }
 
 .forgot-password-btn:disabled {
+  color: #a0aec0;
+  cursor: not-allowed;
+}
+
+.toggle-mode-btn {
+  background: none;
+  border: none;
+  color: #4299e1;
+  cursor: pointer;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  transition: color 0.2s;
+}
+
+.toggle-mode-btn:hover:not(:disabled) {
+  color: #3182ce;
+  text-decoration: underline;
+}
+
+.toggle-mode-btn:disabled {
   color: #a0aec0;
   cursor: not-allowed;
 }

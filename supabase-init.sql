@@ -5,8 +5,9 @@
 CREATE TABLE IF NOT EXISTS players (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, -- 關聯到用戶帳號（可選）
-  name TEXT NOT NULL UNIQUE,
-  balls INTEGER DEFAULT 1 CHECK (balls >= 0),
+  name TEXT NOT NULL UNIQUE, -- 內部識別用（通常是 email）
+  display_name TEXT, -- 顯示名稱（用戶自訂暱稱）
+  balls INTEGER DEFAULT 0 CHECK (balls >= 0),
   is_participating BOOLEAN DEFAULT true, -- 是否參加當前局
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -55,20 +56,24 @@ CREATE TABLE IF NOT EXISTS draw_status (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. 插入預設抽球狀態
+-- 6. 插入預設抽球狀態（僅當表格為空時）
 INSERT INTO draw_status (status, total_participants, total_balls) 
-VALUES ('waiting', 0, 0)
-ON CONFLICT DO NOTHING;
+SELECT 'waiting', 0, 0
+WHERE NOT EXISTS (SELECT 1 FROM draw_status);
 
--- 7. 插入測試資料
-INSERT INTO players (name, balls) VALUES 
-('張三', 3),
-('李四', 2),
-('王五', 5),
-('趙六', 1),
-('小明', 4),
-('小美', 2)
-ON CONFLICT (name) DO NOTHING;
+-- 7. 插入測試資料（僅當表格為空時）
+INSERT INTO players (name, balls) 
+SELECT '張三', 3 WHERE NOT EXISTS (SELECT 1 FROM players WHERE name = '張三')
+UNION ALL
+SELECT '李四', 2 WHERE NOT EXISTS (SELECT 1 FROM players WHERE name = '李四')
+UNION ALL
+SELECT '王五', 5 WHERE NOT EXISTS (SELECT 1 FROM players WHERE name = '王五')
+UNION ALL
+SELECT '趙六', 1 WHERE NOT EXISTS (SELECT 1 FROM players WHERE name = '趙六')
+UNION ALL
+SELECT '小明', 4 WHERE NOT EXISTS (SELECT 1 FROM players WHERE name = '小明')
+UNION ALL
+SELECT '小美', 2 WHERE NOT EXISTS (SELECT 1 FROM players WHERE name = '小美');
 
 -- 8. 設置 Row Level Security (RLS)
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
