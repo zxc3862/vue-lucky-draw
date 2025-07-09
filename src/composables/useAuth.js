@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { supabase } from '../../supabaseClient'
+import { getRedirectUrl } from '../utils/url'
 
 // 全域狀態管理
 const currentUser = ref(null)
@@ -800,7 +801,7 @@ export function useAuth() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/#/verify-email`,
+          emailRedirectTo: getRedirectUrl('/verify-email'),
           data: {
             display_name: displayName || email.split('@')[0]
           }
@@ -873,7 +874,7 @@ export function useAuth() {
       
       // 備用：使用 Supabase 客戶端
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/#/reset-password`
+        redirectTo: getRedirectUrl('/reset-password')
       })
       if (error) throw error
       
@@ -902,7 +903,7 @@ export function useAuth() {
           },
           body: JSON.stringify({
             email: email,
-            redirect_to: `${window.location.origin}/#/reset-password`
+            redirect_to: getRedirectUrl('/reset-password')
           })
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('重設密碼請求超時')), 10000))
