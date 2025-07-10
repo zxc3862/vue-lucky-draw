@@ -120,12 +120,26 @@
                 </button>
               </div>
             </div>
-            <div v-else class="join-prompt">
-              <p>您還沒有參與抽球活動</p>
-              <button @click="handleToggleParticipation" class="join-btn" :disabled="participationLoading">
-                {{ participationLoading ? '處理中...' : '加入抽球' }}
-              </button>
-            </div>
+      <div v-else class="join-prompt">
+        <p>您還沒有參與抽球活動</p>
+        <div class="form-group">
+          <label>Display Name</label>
+          <input 
+            v-model="joinPlayerName" 
+            type="text" 
+            class="form-input" 
+            placeholder="請輸入您的顯示名稱"
+            @keyup.enter="handleJoinWithName"
+          />
+        </div>
+        <button 
+          @click="handleJoinWithName" 
+          class="join-btn" 
+          :disabled="participationLoading || !joinPlayerName.trim()"
+        >
+          {{ participationLoading ? '處理中...' : '加入抽球' }}
+        </button>
+      </div>
           </div>
         </div>
       </section>
@@ -274,6 +288,7 @@ const participationLoading = ref(false)
 // 編輯名稱相關
 const showEditName = ref(false)
 const newPlayerName = ref('')
+const joinPlayerName = ref('')
 const isSaving = ref(false)
 
 // Toast 通知系統
@@ -628,6 +643,47 @@ const handleToggleParticipation = async () => {
   } finally {
     participationLoading.value = false
     console.log('🏁 handleToggleParticipation 完成')
+  }
+}
+
+const handleJoinWithName = async () => {
+  if (!joinPlayerName.value.trim()) {
+    showToast('請輸入您的顯示名稱', 'warning')
+    return
+  }
+
+  participationLoading.value = true
+  try {
+    console.log('🚀 handleJoinWithName 開始，名稱:', joinPlayerName.value.trim())
+    
+    // 先更新用戶的顯示名稱
+    const updateResult = await updateUserDisplayName(joinPlayerName.value.trim())
+    console.log('📊 更新顯示名稱結果:', updateResult)
+    
+    if (!updateResult.success) {
+      showToast('更新顯示名稱失敗: ' + updateResult.error, 'error')
+      return
+    }
+    
+    // 然後加入抽球
+    const result = await toggleParticipation()
+    console.log('📊 toggleParticipation 結果:', result)
+    
+    if (result.success) {
+      showToast(`歡迎 ${joinPlayerName.value} 加入抽球！`, 'success')
+      joinPlayerName.value = '' // 清空輸入框
+      
+      // 重新檢查參與狀態
+      await checkParticipationStatus()
+      await refreshData()
+    } else {
+      showToast(result.error, 'error')
+    }
+  } catch (error) {
+    console.error('加入抽球失敗:', error)
+    showToast('操作失敗，請稍後再試', 'error')
+  } finally {
+    participationLoading.value = false
   }
 }
 
