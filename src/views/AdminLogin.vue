@@ -129,6 +129,7 @@
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import WebStorageService from '../utils/webStorage'
 
 const router = useRouter()
 const { login, register, resetPassword, checkAuth } = useAuth()
@@ -217,25 +218,31 @@ const handleSubmit = async () => {
         messageType.value = 'success'
         message.value = '登入成功！正在跳轉...'
         
-        // 如果勾選記住帳號，則保存到 localStorage
+        // 使用異步 WebStorage 保存帳號
         console.log('🔍 檢查記住帳號狀態:')
         console.log('  - rememberEmail.value:', rememberEmail.value)
         console.log('  - email.value:', email.value)
         
         if (rememberEmail.value) {
           try {
-            localStorage.setItem('rememberedEmail', email.value)
-            console.log('💾 已保存帳號到 localStorage:', email.value)
-            
-            // 立即驗證保存結果
-            const saved = localStorage.getItem('rememberedEmail')
-            console.log('✅ 驗證保存結果:', saved)
+            console.log('💾 開始異步保存帳號...')
+            const success = await WebStorageService.setItemAsync('rememberedEmail', email.value)
+            if (success) {
+              console.log('✅ 異步保存帳號成功:', email.value)
+            } else {
+              console.error('❌ 異步保存帳號失敗')
+            }
           } catch (error) {
-            console.error('❌ 保存到 localStorage 失敗:', error)
+            console.error('❌ 異步保存到 WebStorage 失敗:', error)
           }
         } else {
-          localStorage.removeItem('rememberedEmail')
-          console.log('🗑️ 已清除保存的帳號')
+          console.log('🗑️ 清除保存的帳號...')
+          const success = await WebStorageService.removeItemAsync('rememberedEmail')
+          if (success) {
+            console.log('✅ 已清除保存的帳號')
+          } else {
+            console.error('❌ 清除保存帳號失敗')
+          }
         }
         
         console.log('✅ 登入成功，準備跳轉到首頁')
@@ -305,11 +312,20 @@ const handleForgotPassword = async () => {
   }
 }
 
-// 初始化時載入已保存的帳號
-const loadRememberedEmail = () => {
+// 初始化時載入已保存的帳號（異步版本）
+const loadRememberedEmail = async () => {
   try {
-    const savedEmail = localStorage.getItem('rememberedEmail')
-    console.log('🔍 載入已保存的帳號:', savedEmail)
+    console.log('🔍 開始異步載入已保存的帳號...')
+    
+    // 等待 WebStorage 準備就緒
+    const isReady = await WebStorageService.waitForReady(3000)
+    if (!isReady) {
+      console.error('❌ WebStorage 未準備就緒，跳過載入')
+      return
+    }
+    
+    const savedEmail = await WebStorageService.getItemAsync('rememberedEmail')
+    console.log('🔍 異步載入已保存的帳號:', savedEmail)
     
     if (savedEmail) {
       email.value = savedEmail
@@ -319,52 +335,45 @@ const loadRememberedEmail = () => {
       console.log('📝 沒有保存的帳號')
     }
   } catch (error) {
-    console.error('❌ 載入保存帳號時發生錯誤:', error)
+    console.error('❌ 異步載入保存帳號時發生錯誤:', error)
   }
 }
 
 // 在組件掛載後執行
-onMounted(() => {
-  console.log('🏗️ AdminLogin 組件已掛載，開始載入記住的帳號')
+onMounted(async () => {
+  console.log('🏗️ AdminLogin 組件已掛載，開始異步載入記住的帳號')
   
-  // 延遲一點時間再載入，確保 localStorage 穩定
-  setTimeout(() => {
-    loadRememberedEmail()
-  }, 100) // 延遲 100ms
-  
-  // 再次延遲檢查，以防第一次載入失敗
-  setTimeout(() => {
-    console.log('🔄 第二次檢查記住的帳號')
-    const saved = localStorage.getItem('rememberedEmail')
-    if (saved && !email.value) {
-      console.log('🔧 第二次載入記住的帳號:', saved)
-      email.value = saved
-      rememberEmail.value = true
-    }
-  }, 500) // 延遲 500ms
+  // 使用異步載入
+  await loadRememberedEmail()
 })
 
-// 測試函數 - 檢查 localStorage
-const testLocalStorage = () => {
-  console.log('🧪 測試 localStorage:')
-  console.log('  - rememberedEmail:', localStorage.getItem('rememberedEmail'))
+// 測試函數 - 檢查 localStorage（異步版本）
+const testLocalStorage = async () => {
+  console.log('🧪 測試異步 WebStorage:')
+  const savedEmail = await WebStorageService.getItemAsync('rememberedEmail')
+  console.log('  - rememberedEmail:', savedEmail)
   console.log('  - email.value:', email.value)
   console.log('  - rememberEmail.value:', rememberEmail.value)
 }
 
-// 測試函數 - 手動保存帳號
-const testSaveEmail = () => {
-  console.log('🧪 測試手動保存帳號:')
+// 測試函數 - 手動保存帳號（異步版本）
+const testSaveEmail = async () => {
+  console.log('🧪 測試異步手動保存帳號:')
   console.log('  - 當前 email:', email.value)
   console.log('  - 當前 rememberEmail:', rememberEmail.value)
   
   if (email.value && rememberEmail.value) {
-    localStorage.setItem('rememberedEmail', email.value)
-    console.log('💾 手動保存成功:', email.value)
-    
-    // 立即驗證
-    const saved = localStorage.getItem('rememberedEmail')
-    console.log('✅ 驗證保存結果:', saved)
+    console.log('💾 開始異步保存...')
+    const success = await WebStorageService.setItemAsync('rememberedEmail', email.value)
+    if (success) {
+      console.log('✅ 異步手動保存成功:', email.value)
+      
+      // 立即驗證
+      const saved = await WebStorageService.getItemAsync('rememberedEmail')
+      console.log('✅ 驗證保存結果:', saved)
+    } else {
+      console.error('❌ 異步手動保存失敗')
+    }
   } else {
     console.log('❌ 無法保存：email 或 rememberEmail 為空')
   }
