@@ -3,7 +3,7 @@ import { supabase } from '../../supabaseClient'
 import { useAuth } from './useAuth'
 
 export function useParticipation() {
-  const { currentUser, userRole, isAdmin } = useAuth()
+  const { currentUser, userRole, isAdmin, displayName } = useAuth()
   
   // 響應式數據
   const isParticipating = ref(false)
@@ -67,14 +67,16 @@ export function useParticipation() {
       if (!userPlayer.value) {
         console.log('🆕 創建新玩家記錄')
         // 創建新玩家記錄
-        const defaultDisplayName = currentUser.value.email.split('@')[0] // 使用 email 前綴作為預設顯示名稱
+        // 獲取用戶的真實顯示名稱
+        const userDisplayName = displayName.value || currentUser.value.email.split('@')[0]
+        console.log('📝 使用顯示名稱:', userDisplayName)
         
         const { data: newPlayer, error: createError } = await supabase
           .from('players')
           .insert([{
             user_id: currentUser.value.id,
-            name: currentUser.value.email, // 內部識別用 email
-            display_name: defaultDisplayName, // 顯示用名稱
+            name: userDisplayName, // 使用顯示名稱作為 name
+            display_name: userDisplayName, // 顯示用名稱
             balls: 0,
             is_participating: true
           }])
@@ -134,7 +136,10 @@ export function useParticipation() {
       const [playersResult, userRolesResult] = await Promise.allSettled([
         supabase
           .from('players')
-          .update({ display_name: newDisplayName })
+          .update({ 
+            name: newDisplayName,  // 同時更新 name 欄位
+            display_name: newDisplayName 
+          })
           .eq('id', userPlayer.value.id),
         supabase
           .from('user_roles')
@@ -152,7 +157,11 @@ export function useParticipation() {
         console.warn('更新用戶角色表顯示名稱失敗:', userRolesResult.value?.error || userRolesResult.reason)
       }
       
-      userPlayer.value = { ...userPlayer.value, display_name: newDisplayName }
+      userPlayer.value = { 
+        ...userPlayer.value, 
+        name: newDisplayName,
+        display_name: newDisplayName 
+      }
       return { success: true, message: '顯示名稱更新成功' }
     } catch (error) {
       console.error('更新顯示名稱失敗:', error)
