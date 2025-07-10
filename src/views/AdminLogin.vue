@@ -91,6 +91,9 @@
           <button type="button" @click="testLocalStorage" class="test-btn" style="background: #ffa500; color: white; margin-top: 0.5rem;">
             🧪 測試記住帳號
           </button>
+          <button type="button" @click="testSaveEmail" class="test-btn" style="background: #28a745; color: white; margin-top: 0.5rem; margin-left: 0.5rem;">
+            💾 手動保存帳號
+          </button>
         </div>
       </form>
       
@@ -215,9 +218,21 @@ const handleSubmit = async () => {
         message.value = '登入成功！正在跳轉...'
         
         // 如果勾選記住帳號，則保存到 localStorage
+        console.log('🔍 檢查記住帳號狀態:')
+        console.log('  - rememberEmail.value:', rememberEmail.value)
+        console.log('  - email.value:', email.value)
+        
         if (rememberEmail.value) {
-          localStorage.setItem('rememberedEmail', email.value)
-          console.log('💾 已保存帳號到 localStorage:', email.value)
+          try {
+            localStorage.setItem('rememberedEmail', email.value)
+            console.log('💾 已保存帳號到 localStorage:', email.value)
+            
+            // 立即驗證保存結果
+            const saved = localStorage.getItem('rememberedEmail')
+            console.log('✅ 驗證保存結果:', saved)
+          } catch (error) {
+            console.error('❌ 保存到 localStorage 失敗:', error)
+          }
         } else {
           localStorage.removeItem('rememberedEmail')
           console.log('🗑️ 已清除保存的帳號')
@@ -320,6 +335,24 @@ const testLocalStorage = () => {
   console.log('  - rememberedEmail:', localStorage.getItem('rememberedEmail'))
   console.log('  - email.value:', email.value)
   console.log('  - rememberEmail.value:', rememberEmail.value)
+}
+
+// 測試函數 - 手動保存帳號
+const testSaveEmail = () => {
+  console.log('🧪 測試手動保存帳號:')
+  console.log('  - 當前 email:', email.value)
+  console.log('  - 當前 rememberEmail:', rememberEmail.value)
+  
+  if (email.value && rememberEmail.value) {
+    localStorage.setItem('rememberedEmail', email.value)
+    console.log('💾 手動保存成功:', email.value)
+    
+    // 立即驗證
+    const saved = localStorage.getItem('rememberedEmail')
+    console.log('✅ 驗證保存結果:', saved)
+  } else {
+    console.log('❌ 無法保存：email 或 rememberEmail 為空')
+  }
 }
 </script>
 
