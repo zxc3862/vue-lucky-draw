@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { supabase } from '../../supabaseClient'
+import { supabase, supabaseUrl, supabaseKey } from '../../supabaseClient'
 import { useAuth } from './useAuth'
 
 export function useParticipation() {
@@ -23,17 +23,24 @@ export function useParticipation() {
     
     isLoading.value = true
     try {
-      // 查找用戶關聯的玩家
-      const { data: player, error: playerError } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', currentUser.value.id)
-        .single()
+      // 使用 HTTP API 查找用戶關聯的玩家
+      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/players?user_id=eq.${currentUser.value.id}&select=*`, {
+        method: 'GET',
+        headers: {
+          'apikey': supabase.supabaseKey,
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        }
+      })
 
-      if (playerError && playerError.code !== 'PGRST116') {
-        console.error('查找玩家失敗:', playerError)
-        throw playerError
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+
+      const players = await response.json()
+      const player = players.length > 0 ? players[0] : null
+      const playerError = null
 
       console.log('📊 checkParticipationStatus: 查找到玩家:', player)
 
@@ -71,17 +78,31 @@ export function useParticipation() {
         const userDisplayName = displayName.value || currentUser.value.email.split('@')[0]
         console.log('📝 使用顯示名稱:', userDisplayName)
         
-        const { data: newPlayer, error: createError } = await supabase
-          .from('players')
-          .insert([{
+        // 使用 HTTP API 創建新玩家記錄
+        const response = await fetch(`${supabase.supabaseUrl}/rest/v1/players`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabase.supabaseKey,
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
             user_id: currentUser.value.id,
             name: userDisplayName, // 使用顯示名稱作為 name
             display_name: userDisplayName, // 顯示用名稱
             balls: 0,
             is_participating: true
-          }])
-          .select()
-          .single()
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const newPlayers = await response.json()
+        const newPlayer = newPlayers[0]
+        const createError = null
 
         if (createError) {
           console.error('創建玩家失敗:', createError)
@@ -101,15 +122,22 @@ export function useParticipation() {
           return { success: false, error: '您已經參與抽球活動了' }
         } else {
           console.log('🔄 重新加入抽球')
-          // 重新加入抽球
-          const { error } = await supabase
-            .from('players')
-            .update({ is_participating: true })
-            .eq('id', userPlayer.value.id)
+          // 使用 HTTP API 重新加入抽球
+          const response = await fetch(`${supabase.supabaseUrl}/rest/v1/players?id=eq.${userPlayer.value.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': supabase.supabaseKey,
+              'Authorization': `Bearer ${supabase.supabaseKey}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              is_participating: true
+            })
+          })
 
-          if (error) {
-            console.error('重新加入失敗:', error)
-            throw error
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
           }
           
           console.log('✅ 重新加入成功')
@@ -132,29 +160,43 @@ export function useParticipation() {
     if (!userPlayer.value) return { success: false, error: '找不到玩家資料' }
     
     try {
-      // 同時更新 players 表和 user_roles 表
+      // 使用 HTTP API 同時更新 players 表和 user_roles 表
       const [playersResult, userRolesResult] = await Promise.allSettled([
-        supabase
-          .from('players')
-          .update({ 
+        fetch(`${supabase.supabaseUrl}/rest/v1/players?id=eq.${userPlayer.value.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabase.supabaseKey,
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
             name: newDisplayName,  // 同時更新 name 欄位
             display_name: newDisplayName 
           })
-          .eq('id', userPlayer.value.id),
-        supabase
-          .from('user_roles')
-          .update({ display_name: newDisplayName })
-          .eq('user_id', currentUser.value?.id)
+        }),
+        fetch(`${supabase.supabaseUrl}/rest/v1/user_roles?user_id=eq.${currentUser.value?.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': supabase.supabaseKey,
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            display_name: newDisplayName
+          })
+        })
       ])
 
       // 檢查 players 表更新結果
-      if (playersResult.status === 'rejected' || playersResult.value.error) {
-        throw new Error('更新玩家資料失敗: ' + (playersResult.value?.error?.message || playersResult.reason))
+      if (playersResult.status === 'rejected' || !playersResult.value.ok) {
+        throw new Error('更新玩家資料失敗: ' + (playersResult.reason || `HTTP ${playersResult.value.status}`))
       }
 
       // user_roles 表更新可以失敗（不是致命錯誤）
-      if (userRolesResult.status === 'rejected' || userRolesResult.value.error) {
-        console.warn('更新用戶角色表顯示名稱失敗:', userRolesResult.value?.error || userRolesResult.reason)
+      if (userRolesResult.status === 'rejected' || !userRolesResult.value.ok) {
+        console.warn('更新用戶角色表顯示名稱失敗:', userRolesResult.reason || `HTTP ${userRolesResult.value.status}`)
       }
       
       userPlayer.value = { 
@@ -174,12 +216,22 @@ export function useParticipation() {
     if (!isAdmin.value) return { success: false, error: '權限不足' }
     
     try {
-      const { error } = await supabase
-        .from('players')
-        .update({ is_participating: isParticipating })
-        .eq('id', playerId)
+      const response = await fetch(`${supabase.supabaseUrl}/rest/v1/players?id=eq.${playerId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': supabase.supabaseKey,
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          is_participating: isParticipating
+        })
+      })
 
-      if (error) throw error
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       
       return { success: true }
     } catch (error) {

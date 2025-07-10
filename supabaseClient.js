@@ -28,3 +28,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     flowType: 'implicit'
   }
 })
+
+// 導出配置供直接 HTTP API 使用
+export { supabaseUrl, supabaseKey }
