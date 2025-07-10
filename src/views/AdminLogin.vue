@@ -326,7 +326,22 @@ const loadRememberedEmail = () => {
 // 在組件掛載後執行
 onMounted(() => {
   console.log('🏗️ AdminLogin 組件已掛載，開始載入記住的帳號')
-  loadRememberedEmail()
+  
+  // 延遲一點時間再載入，確保 localStorage 穩定
+  setTimeout(() => {
+    loadRememberedEmail()
+  }, 100) // 延遲 100ms
+  
+  // 再次延遲檢查，以防第一次載入失敗
+  setTimeout(() => {
+    console.log('🔄 第二次檢查記住的帳號')
+    const saved = localStorage.getItem('rememberedEmail')
+    if (saved && !email.value) {
+      console.log('🔧 第二次載入記住的帳號:', saved)
+      email.value = saved
+      rememberEmail.value = true
+    }
+  }, 500) // 延遲 500ms
 })
 
 // 測試函數 - 檢查 localStorage
