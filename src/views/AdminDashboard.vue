@@ -3032,4 +3032,100 @@ const togglePlayerParticipation = async (player) => {
   font-size: 0.875rem;
   margin-top: 0.25rem;
 }
+
+/* 手機版響應式設計 */
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 0.5rem;
+  }
+  
+  .header {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .header h1 {
+    font-size: 1.5rem;
+    text-align: center;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  
+  .players-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .player-card {
+    padding: 0.75rem;
+  }
+  
+  .player-actions {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: center;
+  }
+  
+  .action-btn {
+    min-width: 40px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  
+  .add-player-form {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .form-group select,
+  .form-group input {
+    font-size: 16px; /* 防止 iOS Safari 縮放 */
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 0.25rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stat-card {
+    padding: 0.75rem;
+  }
+  
+  .player-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+  
+  .action-btn {
+    width: 100%;
+    text-align: center;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .player-info h3 {
+    font-size: 0.9rem;
+  }
+  
+  .player-info p {
+    font-size: 0.8rem;
+  }
+}
 </style>
