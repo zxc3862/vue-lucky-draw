@@ -34,6 +34,18 @@
           />
         </div>
         
+        <div v-if="!isRegisterMode" class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              id="rememberEmail"
+              v-model="rememberEmail"
+              type="checkbox"
+              class="checkbox-input"
+            />
+            <span class="checkbox-text">記住帳號</span>
+          </label>
+        </div>
+        
         <div v-if="isRegisterMode" class="form-group">
           <label for="confirmPassword">確認密碼</label>
           <input
@@ -117,6 +129,7 @@ const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const displayName = ref('')
+const rememberEmail = ref(false)
 const message = ref('')
 const messageType = ref('')
 const isLoading = ref(false)
@@ -189,6 +202,13 @@ const handleSubmit = async () => {
         messageType.value = 'success'
         message.value = '登入成功！正在跳轉...'
         
+        // 如果勾選記住帳號，則保存到 localStorage
+        if (rememberEmail.value) {
+          localStorage.setItem('rememberedEmail', email.value)
+        } else {
+          localStorage.removeItem('rememberedEmail')
+        }
+        
         console.log('✅ 登入成功，準備跳轉到首頁')
         
         // 使用多種方式確保跳轉成功
@@ -255,6 +275,18 @@ const handleForgotPassword = async () => {
     isLoading.value = false
   }
 }
+
+// 初始化時載入已保存的帳號
+const loadRememberedEmail = () => {
+  const savedEmail = localStorage.getItem('rememberedEmail')
+  if (savedEmail) {
+    email.value = savedEmail
+    rememberEmail.value = true
+  }
+}
+
+// 組件載入時執行
+loadRememberedEmail()
 </script>
 
 <style scoped>
@@ -300,6 +332,29 @@ const handleForgotPassword = async () => {
 
 .form-group {
   margin-bottom: 1.5rem;
+}
+
+.form-group.checkbox-group {
+  margin-bottom: 1rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.checkbox-input {
+  margin-right: 0.5rem;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checkbox-text {
+  user-select: none;
 }
 
 .form-group label {
