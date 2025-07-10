@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測試 Supabase 連接</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #3182ce;
+        }
+        .result {
+            background: #e6fffa;
+            border: 1px solid #38b2ac;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #fed7d7;
+            border: 1px solid #e53e3e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Supabase 連接診斷</h1>
+    
+    <div class="test-section">
+        <h3>環境變數檢查</h3>
+        <button class="test-button" onclick="checkEnvironment()">檢查環境變數</button>
+        <div id="envResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Supabase 客戶端測試</h3>
+        <button class="test-button" onclick="testSupabaseConnection()">測試 Supabase 連接</button>
+        <div id="supabaseResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>API 端點測試</h3>
+        <button class="test-button" onclick="testPlayersEndpoint()">測試 Players API</button>
+        <div id="apiResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script type="module">
+        // 模擬 Vite 環境變數
+        const mockEnv = {
+            VITE_SUPABASE_URL: 'https://qzffahnlwvxgfovmrjia.supabase.co',
+            VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6ZmZhaG5sd3Z4Z2Zvdm1yamlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1MjkxNTUsImV4cCI6MjA2NzEwNTE1NX0.1VmdnGXMd4EuDfO22OvJkzXgSopva-ZMka84T8OBrU8'
+        };
+
+        window.checkEnvironment = function() {
+            const resultDiv = document.getElementById('envResult');
+            
+            const envInfo = {
+                'VITE_SUPABASE_URL': mockEnv.VITE_SUPABASE_URL,
+                'VITE_SUPABASE_ANON_KEY': mockEnv.VITE_SUPABASE_ANON_KEY ? 
+                    mockEnv.VITE_SUPABASE_ANON_KEY.substring(0, 50) + '...' : 
+                    'undefined',
+                'Current Origin': window.location.origin,
+                'User Agent': navigator.userAgent
+            };
+
+            resultDiv.innerHTML = JSON.stringify(envInfo, null, 2);
+            resultDiv.className = 'result';
+            resultDiv.style.display = 'block';
+        };
+
+        window.testSupabaseConnection = async function() {
+            const resultDiv = document.getElementById('supabaseResult');
+            resultDiv.innerHTML = '正在測試 Supabase 連接...';
+            resultDiv.style.display = 'block';
+
+            try {
+                // 動態載入 Supabase
+                const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js');
+                
+                const supabaseUrl = mockEnv.VITE_SUPABASE_URL;
+                const supabaseKey = mockEnv.VITE_SUPABASE_ANON_KEY;
+
+                console.log('🔗 建立 Supabase 客戶端:', supabaseUrl);
+
+                const supabase = createClient(supabaseUrl, supabaseKey, {
+                    auth: {
+                        autoRefreshToken: false,
+                        persistSession: false,
+                        detectSessionInUrl: false,
+                    }
+                });
+
+                // 測試基本連接
+                const { data, error, count } = await supabase
+                    .from('players')
+                    .select('*', { count: 'exact', head: true });
+
+                if (error) {
+                    throw error;
+                }
+
+                resultDiv.innerHTML = `✅ Supabase 連接成功！
+URL: ${supabaseUrl}
+Players 表格記錄數: ${count}
+測試時間: ${new Date().toLocaleString()}`;
+                resultDiv.className = 'result';
+
+            } catch (error) {
+                console.error('Supabase 連接測試失敗:', error);
+                resultDiv.innerHTML = `❌ Supabase 連接失敗:
+錯誤訊息: ${error.message}
+錯誤詳情: ${error.details || 'N/A'}
+錯誤代碼: ${error.code || 'N/A'}
+測試時間: ${new Date().toLocaleString()}`;
+                resultDiv.className = 'result error';
+            }
+        };
+
+        window.testPlayersEndpoint = async function() {
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.innerHTML = '正在測試 Players API...';
+            resultDiv.style.display = 'block';
+
+            try {
+                const url = `${mockEnv.VITE_SUPABASE_URL}/rest/v1/players?select=*&is_participating=eq.true&order=balls.desc`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': mockEnv.VITE_SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${mockEnv.VITE_SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=representation'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                resultDiv.innerHTML = `✅ Players API 測試成功！
+請求 URL: ${url}
+回應狀態: ${response.status} ${response.statusText}
+資料數量: ${data.length}
+測試時間: ${new Date().toLocaleString()}
+
+回應資料範例:
+${JSON.stringify(data.slice(0, 2), null, 2)}`;
+                resultDiv.className = 'result';
+
+            } catch (error) {
+                console.error('Players API 測試失敗:', error);
+                resultDiv.innerHTML = `❌ Players API 測試失敗:
+錯誤訊息: ${error.message}
+測試時間: ${new Date().toLocaleString()}`;
+                resultDiv.className = 'result error';
+            }
+        };
+    </script>
+</body>
+</html>

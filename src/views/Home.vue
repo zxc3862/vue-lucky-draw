@@ -583,14 +583,28 @@ const handleLogout = async () => {
   
   console.log('🔄 用戶確認登出，執行登出...')
   try {
+    // 在清除 localStorage 之前，備份記住帳號的設定
+    const rememberAccountKey = 'vue-lucky-draw-remember-account'
+    const savedEmailKey = 'vue-lucky-draw-saved-email'
+    const savedRememberAccount = localStorage.getItem(rememberAccountKey)
+    const savedEmail = localStorage.getItem(savedEmailKey)
+    
     const result = await logout()
     console.log('📊 登出結果:', result)
     
     if (result.success) {
       console.log('🔄 準備重新載入頁面...')
-      // 立即清除所有狀態並重新載入，不顯示 alert
+      // 立即清除所有狀態並重新載入，但保留記住帳號設定
       sessionStorage.clear()
       localStorage.clear()
+      
+      // 重新存入記住帳號的設定
+      if (savedRememberAccount === 'true' && savedEmail) {
+        localStorage.setItem(rememberAccountKey, savedRememberAccount)
+        localStorage.setItem(savedEmailKey, savedEmail)
+        console.log('💾 已保留記住帳號設定:', savedEmail)
+      }
+      
       window.location.href = '/'
     } else {
       alert('❌ 登出失敗: ' + (result.error || '未知錯誤'))

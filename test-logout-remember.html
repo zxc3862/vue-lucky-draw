@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測試登出後記住帳號功能</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #3182ce;
+        }
+        .result {
+            background: #e6fffa;
+            border: 1px solid #38b2ac;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #fed7d7;
+            border: 1px solid #e53e3e;
+        }
+        input[type="email"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 測試登出後記住帳號功能</h1>
+    
+    <div class="test-section">
+        <h3>步驟 1: 設定記住帳號</h3>
+        <label>
+            <input type="checkbox" id="rememberCheckbox"> 記住帳號
+        </label>
+        <br><br>
+        <label>
+            Email: <input type="email" id="emailInput" placeholder="請輸入測試 Email">
+        </label>
+        <br><br>
+        <button class="test-button" onclick="saveRememberAccount()">儲存記住帳號設定</button>
+    </div>
+
+    <div class="test-section">
+        <h3>步驟 2: 模擬登出行為</h3>
+        <p>這將執行與 Home.vue 中相同的邏輯</p>
+        <button class="test-button" onclick="simulateLogout()">模擬登出（備份並清除 localStorage）</button>
+    </div>
+
+    <div class="test-section">
+        <h3>步驟 3: 檢查結果</h3>
+        <button class="test-button" onclick="checkRememberAccount()">檢查記住帳號是否保留</button>
+        <div id="result" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>LocalStorage 檢視器</h3>
+        <button class="test-button" onclick="showLocalStorage()">顯示所有 LocalStorage</button>
+        <button class="test-button" onclick="clearAllStorage()">清除所有 LocalStorage</button>
+        <div id="storageResult" class="result" style="display:none;"></div>
+    </div>
+
+    <script>
+        const REMEMBER_ACCOUNT_KEY = 'vue-lucky-draw-remember-account';
+        const SAVED_EMAIL_KEY = 'vue-lucky-draw-saved-email';
+
+        function saveRememberAccount() {
+            const rememberCheckbox = document.getElementById('rememberCheckbox');
+            const emailInput = document.getElementById('emailInput');
+
+            if (rememberCheckbox.checked && emailInput.value) {
+                localStorage.setItem(REMEMBER_ACCOUNT_KEY, 'true');
+                localStorage.setItem(SAVED_EMAIL_KEY, emailInput.value);
+                alert(`✅ 已儲存記住帳號設定: ${emailInput.value}`);
+            } else {
+                localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+                localStorage.removeItem(SAVED_EMAIL_KEY);
+                alert('🗑️ 已清除記住帳號設定');
+            }
+        }
+
+        function simulateLogout() {
+            // 模擬 Home.vue 中的登出邏輯
+            console.log('🔄 模擬登出流程開始...');
+
+            // 在清除 localStorage 之前，備份記住帳號的設定
+            const savedRememberAccount = localStorage.getItem(REMEMBER_ACCOUNT_KEY);
+            const savedEmail = localStorage.getItem(SAVED_EMAIL_KEY);
+            
+            console.log('💾 備份記住帳號設定:', {
+                rememberAccount: savedRememberAccount,
+                email: savedEmail
+            });
+
+            // 清除所有 localStorage（模擬登出）
+            localStorage.clear();
+            console.log('🧹 已清除所有 localStorage');
+
+            // 重新存入記住帳號的設定
+            if (savedRememberAccount === 'true' && savedEmail) {
+                localStorage.setItem(REMEMBER_ACCOUNT_KEY, savedRememberAccount);
+                localStorage.setItem(SAVED_EMAIL_KEY, savedEmail);
+                console.log('💾 已重新存入記住帳號設定:', savedEmail);
+                alert(`✅ 登出完成，記住帳號設定已保留: ${savedEmail}`);
+            } else {
+                console.log('❌ 沒有記住帳號設定需要保留');
+                alert('✅ 登出完成，沒有記住帳號設定');
+            }
+        }
+
+        function checkRememberAccount() {
+            const resultDiv = document.getElementById('result');
+            const savedRememberAccount = localStorage.getItem(REMEMBER_ACCOUNT_KEY);
+            const savedEmail = localStorage.getItem(SAVED_EMAIL_KEY);
+
+            const result = {
+                '記住帳號設定': savedRememberAccount || '(未設定)',
+                '儲存的 Email': savedEmail || '(未設定)',
+                '狀態': (savedRememberAccount === 'true' && savedEmail) ? '✅ 記住帳號功能正常' : '❌ 記住帳號功能失效'
+            };
+
+            resultDiv.innerHTML = JSON.stringify(result, null, 2);
+            resultDiv.className = 'result';
+            resultDiv.style.display = 'block';
+
+            // 同步更新表單
+            const rememberCheckbox = document.getElementById('rememberCheckbox');
+            const emailInput = document.getElementById('emailInput');
+            
+            if (savedRememberAccount === 'true' && savedEmail) {
+                rememberCheckbox.checked = true;
+                emailInput.value = savedEmail;
+            } else {
+                rememberCheckbox.checked = false;
+                emailInput.value = '';
+            }
+        }
+
+        function showLocalStorage() {
+            const resultDiv = document.getElementById('storageResult');
+            const allItems = {};
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                allItems[key] = value;
+            }
+
+            resultDiv.innerHTML = `LocalStorage 內容 (共 ${localStorage.length} 項):\n${JSON.stringify(allItems, null, 2)}`;
+            resultDiv.className = 'result';
+            resultDiv.style.display = 'block';
+        }
+
+        function clearAllStorage() {
+            localStorage.clear();
+            sessionStorage.clear();
+            document.getElementById('rememberCheckbox').checked = false;
+            document.getElementById('emailInput').value = '';
+            alert('🧹 已清除所有 Storage');
+            showLocalStorage();
+        }
+
+        // 頁面載入時自動檢查
+        window.onload = function() {
+            checkRememberAccount();
+            showLocalStorage();
+        };
+    </script>
+</body>
+</html>

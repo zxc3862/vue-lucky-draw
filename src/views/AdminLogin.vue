@@ -34,6 +34,19 @@
           />
         </div>
         
+        <div v-if="!isRegisterMode" class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              v-model="rememberAccount"
+              @change="handleRememberAccountChange"
+              :disabled="isLoading"
+              class="checkbox-input"
+            />
+            <span class="checkbox-text">記住帳號</span>
+          </label>
+        </div>
+        
         <div v-if="isRegisterMode" class="form-group">
           <label for="confirmPassword">確認密碼</label>
           <input
@@ -106,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
@@ -121,6 +134,61 @@ const message = ref('')
 const messageType = ref('')
 const isLoading = ref(false)
 const isRegisterMode = ref(false)
+const rememberAccount = ref(false)
+
+// localStorage 的 key
+const REMEMBER_ACCOUNT_KEY = 'vue-lucky-draw-remember-account'
+const SAVED_EMAIL_KEY = 'vue-lucky-draw-saved-email'
+
+// 載入已儲存的帳號設定
+const loadSavedAccount = () => {
+  try {
+    const savedRemember = localStorage.getItem(REMEMBER_ACCOUNT_KEY)
+    const savedEmail = localStorage.getItem(SAVED_EMAIL_KEY)
+    
+    if (savedRemember === 'true' && savedEmail) {
+      rememberAccount.value = true
+      email.value = savedEmail
+      console.log('📧 已載入記住的帳號:', savedEmail)
+    }
+  } catch (error) {
+    console.error('載入記住帳號設定時發生錯誤:', error)
+  }
+}
+
+// 儲存帳號設定
+const saveAccountSettings = () => {
+  try {
+    if (rememberAccount.value && email.value) {
+      localStorage.setItem(REMEMBER_ACCOUNT_KEY, 'true')
+      localStorage.setItem(SAVED_EMAIL_KEY, email.value)
+      console.log('💾 已儲存帳號:', email.value)
+    } else {
+      localStorage.removeItem(REMEMBER_ACCOUNT_KEY)
+      localStorage.removeItem(SAVED_EMAIL_KEY)
+      console.log('🗑️ 已清除記住的帳號設定')
+    }
+  } catch (error) {
+    console.error('儲存帳號設定時發生錯誤:', error)
+  }
+}
+
+// 處理記住帳號選項變更
+const handleRememberAccountChange = () => {
+  saveAccountSettings()
+}
+
+// 監聽 email 變更，如果有勾選記住帳號就自動儲存
+watch(email, (newEmail) => {
+  if (rememberAccount.value && newEmail) {
+    saveAccountSettings()
+  }
+})
+
+// 組件掛載時載入已儲存的設定
+onMounted(() => {
+  loadSavedAccount()
+})
 
 const isValidForm = computed(() => {
   if (isRegisterMode.value) {
@@ -137,7 +205,10 @@ const toggleMode = () => {
 }
 
 const clearForm = () => {
-  email.value = ''
+  // 如果有勾選記住帳號，就不清除 email
+  if (!rememberAccount.value) {
+    email.value = ''
+  }
   password.value = ''
   confirmPassword.value = ''
   displayName.value = ''
@@ -166,7 +237,7 @@ const handleSubmit = async () => {
         
         console.log('✅ AdminLogin.vue: 註冊成功，準備切換到登入模式')
         
-        // 註冊成功後自動切換到登入模式 (2秒延遲)
+        // 註冊成功後自動切換到登入模式
         setTimeout(() => {
           isRegisterMode.value = false
           clearForm()
@@ -186,6 +257,9 @@ const handleSubmit = async () => {
       console.log('📊 登入結果:', result)
       
       if (result.success) {
+        // 登入成功時儲存帳號設定
+        saveAccountSettings()
+        
         messageType.value = 'success'
         message.value = '登入成功！正在跳轉...'
         
@@ -330,6 +404,33 @@ const handleForgotPassword = async () => {
   background: #f7fafc;
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.checkbox-group {
+  margin-bottom: 1rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  gap: 0.5rem;
+}
+
+.checkbox-input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.checkbox-text {
+  user-select: none;
+}
+
+.checkbox-label:hover .checkbox-text {
+  color: #4299e1;
 }
 
 .login-btn {
