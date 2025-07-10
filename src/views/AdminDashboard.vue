@@ -1885,7 +1885,7 @@ const togglePlayerParticipation = async (player) => {
     alert(successMsg)
     
     // 重新整理數據
-    await refreshData()
+    await refreshPlayers()
     
   } catch (error) {
     console.error('切換玩家參與狀態失敗:', error)
