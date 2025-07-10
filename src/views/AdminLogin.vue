@@ -86,6 +86,11 @@
           <button v-if="!isRegisterMode" type="button" @click="handleForgotPassword" class="forgot-password-btn" :disabled="isLoading || !email">
             🔑 忘記密碼？
           </button>
+          
+          <!-- 調試按鈕 -->
+          <button type="button" @click="testLocalStorage" class="test-btn" style="background: #ffa500; color: white; margin-top: 0.5rem;">
+            🧪 測試記住帳號
+          </button>
         </div>
       </form>
       
@@ -118,7 +123,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 
@@ -303,8 +308,19 @@ const loadRememberedEmail = () => {
   }
 }
 
-// 組件載入時執行
-loadRememberedEmail()
+// 在組件掛載後執行
+onMounted(() => {
+  console.log('🏗️ AdminLogin 組件已掛載，開始載入記住的帳號')
+  loadRememberedEmail()
+})
+
+// 測試函數 - 檢查 localStorage
+const testLocalStorage = () => {
+  console.log('🧪 測試 localStorage:')
+  console.log('  - rememberedEmail:', localStorage.getItem('rememberedEmail'))
+  console.log('  - email.value:', email.value)
+  console.log('  - rememberEmail.value:', rememberEmail.value)
+}
 </script>
 
 <style scoped>
