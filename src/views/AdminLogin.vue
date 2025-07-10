@@ -34,18 +34,6 @@
           />
         </div>
         
-        <div v-if="!isRegisterMode" class="form-group checkbox-group">
-          <label class="checkbox-label">
-            <input
-              id="rememberEmail"
-              v-model="rememberEmail"
-              type="checkbox"
-              class="checkbox-input"
-            />
-            <span class="checkbox-text">記住帳號</span>
-          </label>
-        </div>
-        
         <div v-if="isRegisterMode" class="form-group">
           <label for="confirmPassword">確認密碼</label>
           <input
@@ -71,6 +59,18 @@
             :disabled="isLoading"
             class="form-input"
           />
+        </div>
+        
+        <div v-if="!isRegisterMode" class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input
+              id="rememberEmail"
+              v-model="rememberEmail"
+              type="checkbox"
+              class="checkbox-input"
+            />
+            <span class="checkbox-text">記住帳號</span>
+          </label>
         </div>
         
         <button type="submit" :disabled="isLoading || !isValidForm" class="login-btn">
@@ -150,8 +150,15 @@ const toggleMode = () => {
 }
 
 const clearForm = () => {
-  email.value = ''
-  password.value = ''
+  // 如果在登入模式且勾選記住帳號，則不清除 email
+  if (!isRegisterMode.value && rememberEmail.value) {
+    // 只清除密碼相關欄位
+    password.value = ''
+  } else {
+    // 清除所有欄位
+    email.value = ''
+    password.value = ''
+  }
   confirmPassword.value = ''
   displayName.value = ''
 }
@@ -205,8 +212,10 @@ const handleSubmit = async () => {
         // 如果勾選記住帳號，則保存到 localStorage
         if (rememberEmail.value) {
           localStorage.setItem('rememberedEmail', email.value)
+          console.log('💾 已保存帳號到 localStorage:', email.value)
         } else {
           localStorage.removeItem('rememberedEmail')
+          console.log('🗑️ 已清除保存的帳號')
         }
         
         console.log('✅ 登入成功，準備跳轉到首頁')
@@ -278,10 +287,19 @@ const handleForgotPassword = async () => {
 
 // 初始化時載入已保存的帳號
 const loadRememberedEmail = () => {
-  const savedEmail = localStorage.getItem('rememberedEmail')
-  if (savedEmail) {
-    email.value = savedEmail
-    rememberEmail.value = true
+  try {
+    const savedEmail = localStorage.getItem('rememberedEmail')
+    console.log('🔍 載入已保存的帳號:', savedEmail)
+    
+    if (savedEmail) {
+      email.value = savedEmail
+      rememberEmail.value = true
+      console.log('✅ 已載入保存的帳號:', savedEmail)
+    } else {
+      console.log('📝 沒有保存的帳號')
+    }
+  } catch (error) {
+    console.error('❌ 載入保存帳號時發生錯誤:', error)
   }
 }
 
